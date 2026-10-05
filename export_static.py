@@ -1,0 +1,46 @@
+"""Exports the database to docs/index.html (+ data.json): a static dashboard for GitHub Pages.
+Works in any browser, nothing to install, Somali/English switch, filters by day/month/year."""
+import json, pathlib, db
+db.init(); con = db.connect()
+rows = [dict(r) for r in con.execute(
+    "SELECT day,month,year,source_type,source_name,title,title_so,url,topics,sentiment,country FROM mentions ORDER BY day DESC, id DESC LIMIT 20000")]
+summ = [dict(r) for r in con.execute("SELECT period,period_key,summary_en,summary_so,mention_count FROM summaries")]
+con.close()
+out = pathlib.Path("docs"); out.mkdir(exist_ok=True)
+(out / "data.json").write_text(json.dumps({"mentions": rows, "summaries": summ}, ensure_ascii=False), encoding="utf-8")
+
+(out / "index.html").write_text("""<!doctype html><html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Somaliland Media Monitor</title><style>
+body{font:15px system-ui,sans-serif;margin:0;background:#f6f7f9;color:#1b1f24}
+header{background:#0b5d3b;color:#fff;padding:14px 20px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+main{max-width:1150px;margin:auto;padding:16px}.card{background:#fff;border-radius:10px;padding:14px;margin-bottom:14px;box-shadow:0 1px 3px #0001}
+button,select,input{padding:6px 10px;border:1px solid #ccc;border-radius:6px;background:#fff}button.on{background:#0b5d3b;color:#fff}
+.bar{display:flex;align-items:center;gap:8px;cursor:pointer;margin:3px 0}.k{width:90px;font-size:13px}.b{height:12px;background:#2e9e6b;border-radius:3px}
+td{padding:6px;border-bottom:1px solid #eee;font-size:14px;vertical-align:top}table{width:100%;border-collapse:collapse}
+pre{white-space:pre-wrap;font:14px/1.5 system-ui}.positive{color:#1a7f37}.negative{color:#c0392b}a{color:#0b5d3b}
+</style><header><b id=t></b><span><button id=lg></button></span></header><main>
+<div class=card><span id=pb></span> <select id=topic></select> <select id=type></select> <input id=q placeholder="..."></div>
+<div class=card><div id=bars></div></div><div class=card id=sum style="display:none"></div><div class=card><table id=tb></table></div></main>
+<script>
+const L={so:{t:"Kormeeraha Warbaahinta Caalamiga ee Somaliland",year:"Sannad",month:"Bil",day:"Maalin",all:"Dhammaan",s:"Soo koobid",lg:"English"},
+en:{t:"Somaliland International Media Monitor",year:"Year",month:"Month",day:"Day",all:"All",s:"Summary",lg:"Soomaali"}};
+let D,lang="so",per="month",key="",topic="",type="";
+const $=i=>document.getElementById(i),esc=s=>(s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+fetch("data.json").then(r=>r.json()).then(d=>{D=d;
+ const tp=[...new Set(d.mentions.flatMap(m=>(m.topics||"").split(",")).filter(Boolean))].sort(),ty=[...new Set(d.mentions.map(m=>m.source_type))];
+ $("topic").innerHTML="<option value=''>"+"topic</option>"+tp.map(x=>`<option>${x}</option>`).join("");
+ $("type").innerHTML="<option value=''>type</option>"+ty.map(x=>`<option>${x}</option>`).join("");
+ $("topic").onchange=e=>{topic=e.target.value;draw()};$("type").onchange=e=>{type=e.target.value;draw()};$("q").oninput=draw;
+ $("lg").onclick=()=>{lang=lang=="so"?"en":"so";draw()};draw()});
+function draw(){const t=L[lang];document.documentElement.lang=lang;$("t").textContent=t.t;$("lg").textContent=t.lg;
+ $("pb").innerHTML=["year","month","day"].map(p=>`<button class="${p==per?"on":""}" onclick="per='${p}';key='';draw()">${t[p]}</button>`).join(" ");
+ const c={};D.mentions.forEach(m=>{const k=m[per];if(k)c[k]=(c[k]||0)+1});
+ const ks=Object.keys(c).sort().reverse().slice(0,36),mx=Math.max(1,...ks.map(k=>c[k]));
+ $("bars").innerHTML=ks.map(k=>`<div class=bar onclick="key='${k}';draw()"><span class=k>${k}</span><span class=b style="width:${c[k]/mx*100}%"></span><span>${c[k]}</span></div>`).join("");
+ const s=D.summaries.find(x=>x.period==per&&x.period_key==key);
+ $("sum").style.display=s?"block":"none";if(s)$("sum").innerHTML=`<h3>${t.s} — ${key} (${s.mention_count})</h3><pre>${esc(lang=="so"&&s.summary_so?s.summary_so:s.summary_en)}</pre>`;
+ const q=$("q").value.toLowerCase();
+ const r=D.mentions.filter(m=>(!key||m[per]==key)&&(!topic||(","+m.topics+",").includes(","+topic+","))&&(!type||m.source_type==type)&&(!q||((m.title||"")+(m.title_so||"")).toLowerCase().includes(q))).slice(0,300);
+ $("tb").innerHTML=r.map(m=>`<tr><td>${m.day}</td><td><a href="${esc(m.url)}" target=_blank rel=noopener>${esc(lang=="so"&&m.title_so?m.title_so:m.title)}</a></td><td>${esc(m.source_name)}</td><td>${esc(m.topics)}</td><td class="${m.sentiment}">${m.sentiment}</td></tr>`).join("")}
+</script></html>""", encoding="utf-8")
+print("exported", len(rows), "mentions")
