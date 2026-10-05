@@ -112,5 +112,7 @@ class H(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     db.init()
-    print("Dashboard: http://127.0.0.1:8000")
-    ThreadingHTTPServer(("127.0.0.1", 8000), H).serve_forever()
+    import os
+    port = int(os.environ.get("PORT", "8000")); host = os.environ.get("HOST", "0.0.0.0" if os.environ.get("PORT") else "127.0.0.1")
+    print(f"Dashboard: http://{host}:{port}")
+    ThreadingHTTPServer((host, port), H).serve_forever()
