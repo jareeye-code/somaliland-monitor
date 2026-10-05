@@ -1,0 +1,5 @@
+requests>=2.32
+# Optional (better Somali translation / summaries):
+anthropic>=0.40
+# Optional free fallback translator:
+deep-translator>=1.11
