@@ -1,0 +1,32 @@
+name: Collect Somaliland mentions
+on:
+  schedule:
+    - cron: "0 */6 * * *"      # every 6 hours, in the cloud
+  workflow_dispatch:            # lets you press "Run workflow" manually
+    inputs:
+      backfill:
+        description: "History window for first run (e.g. 90d, 365d)"
+        default: "7d"
+permissions:
+  contents: write
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.13" }
+      - run: pip install -r requirements.txt
+      - name: Collect, translate, summarize
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
+        run: python agent.py backfill "${{ github.event.inputs.backfill || '7d' }}"
+      - run: python export_static.py
+      - name: Save database + dashboard back to the repo
+        run: |
+          git config user.name "monitor-bot"; git config user.email "bot@users.noreply.github.com"
+          git add somaliland.db docs
+          git commit -m "Update $(date -u +%F-%H%M)" || echo "nothing new"
+          git push
