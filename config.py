@@ -43,3 +43,7 @@ ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")
 
 COLLECT_EVERY_MINUTES = 60
 USER_AGENT = "SomalilandMonitor/1.0 (research tool)"
+
+# Per-article summaries
+ARTICLE_SUMMARIES_PER_RUN = int(os.environ.get("ARTICLE_SUMMARIES_PER_RUN", "40"))  # cost/time limit per run
+ARTICLE_MAX_CHARS = 6000      # text sent to the summarizer

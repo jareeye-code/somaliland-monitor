@@ -5,7 +5,7 @@ Usage:
   python agent.py backfill 365d   # GDELT history (e.g. 30d, 6m, 1y -> use 'NNNd' / 'NNw' / 'NNm')
 """
 import sys, time
-import config, db, analyze, collectors, summarize
+import config, db, analyze, collectors, summarize, articles
 from translate import to_somali
 
 def run_cycle(gdelt_span="7d"):
@@ -25,6 +25,7 @@ def run_cycle(gdelt_span="7d"):
         time.sleep(1)  # be polite to APIs
     print(f"[collect] {new} new mentions")
     translate_pending(con)
+    articles.run_pending(con)
     con.close()
     summarize.build()
     print("[done]")

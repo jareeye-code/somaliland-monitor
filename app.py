@@ -56,7 +56,9 @@ def page(q):
     trs = ""
     for r in rows:
         title = r["title_so"] if lang == "so" and r["title_so"] else r["title"]
-        trs += (f'<tr><td>{e(r["day"] or "")}</td><td><a href="{e(r["url"] or "#")}" target="_blank" rel="noopener">{e(title or "")}</a></td>'
+        sbody = r["summary_so"] if lang == "so" and r["summary_so"] else r["summary_en"]
+        sm = f'<details><summary>{t["summary"]}</summary><div>{e(sbody)}</div></details>' if sbody else ""
+        trs += (f'<tr><td>{e(r["day"] or "")}</td><td><a href="{e(r["url"] or "#")}" target="_blank" rel="noopener">{e(title or "")}</a>{sm}</td>'
                 f'<td>{e(r["source_name"] or "")}</td><td>{e(r["topics"] or "")}</td><td class="s-{e(r["sentiment"] or "")}">{e(r["sentiment"] or "")}</td></tr>')
     total = con.execute("SELECT COUNT(*) FROM mentions").fetchone()[0]
     con.close()

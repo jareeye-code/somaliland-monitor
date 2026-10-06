@@ -17,6 +17,9 @@ CREATE TABLE IF NOT EXISTS mentions (
     sentiment     TEXT,               -- positive | neutral | negative
     title_so      TEXT,               -- Somali translation
     snippet_so    TEXT,
+    summary_en    TEXT,               -- per-article summary (English)
+    summary_so    TEXT,               -- per-article summary (Somali)
+    summary_status TEXT,              -- full_text | snippet | failed
     collected_at  TEXT DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_day   ON mentions(day);

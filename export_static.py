@@ -3,7 +3,7 @@ Works in any browser, nothing to install, Somali/English switch, filters by day/
 import json, pathlib, db
 db.init(); con = db.connect()
 rows = [dict(r) for r in con.execute(
-    "SELECT day,month,year,source_type,source_name,title,title_so,url,topics,sentiment,country FROM mentions ORDER BY day DESC, id DESC LIMIT 20000")]
+    "SELECT day,month,year,source_type,source_name,title,title_so,url,topics,sentiment,country,summary_en,summary_so FROM mentions ORDER BY day DESC, id DESC LIMIT 20000")]
 summ = [dict(r) for r in con.execute("SELECT period,period_key,summary_en,summary_so,mention_count FROM summaries")]
 con.close()
 out = pathlib.Path("docs"); out.mkdir(exist_ok=True)
@@ -22,8 +22,8 @@ pre{white-space:pre-wrap;font:14px/1.5 system-ui}.positive{color:#1a7f37}.negati
 <div class=card><span id=pb></span> <select id=topic></select> <select id=type></select> <input id=q placeholder="..."></div>
 <div class=card><div id=bars></div></div><div class=card id=sum style="display:none"></div><div class=card><table id=tb></table></div></main>
 <script>
-const L={so:{t:"Kormeeraha Warbaahinta Caalamiga ee Somaliland",year:"Sannad",month:"Bil",day:"Maalin",all:"Dhammaan",s:"Soo koobid",lg:"English"},
-en:{t:"Somaliland International Media Monitor",year:"Year",month:"Month",day:"Day",all:"All",s:"Summary",lg:"Soomaali"}};
+const L={so:{t:"Kormeeraha Warbaahinta Caalamiga ee Somaliland",year:"Sannad",month:"Bil",day:"Maalin",all:"Dhammaan",s:"Soo koobid",sm:"Akhri soo koobidda",lg:"English"},
+en:{t:"Somaliland International Media Monitor",year:"Year",month:"Month",day:"Day",all:"All",s:"Summary",sm:"Read summary",lg:"Soomaali"}};
 let D,lang="so",per="month",key="",topic="",type="";
 const $=i=>document.getElementById(i),esc=s=>(s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 fetch("data.json").then(r=>r.json()).then(d=>{D=d;
@@ -41,6 +41,6 @@ function draw(){const t=L[lang];document.documentElement.lang=lang;$("t").textCo
  $("sum").style.display=s?"block":"none";if(s)$("sum").innerHTML=`<h3>${t.s} — ${key} (${s.mention_count})</h3><pre>${esc(lang=="so"&&s.summary_so?s.summary_so:s.summary_en)}</pre>`;
  const q=$("q").value.toLowerCase();
  const r=D.mentions.filter(m=>(!key||m[per]==key)&&(!topic||(","+m.topics+",").includes(","+topic+","))&&(!type||m.source_type==type)&&(!q||((m.title||"")+(m.title_so||"")).toLowerCase().includes(q))).slice(0,300);
- $("tb").innerHTML=r.map(m=>`<tr><td>${m.day}</td><td><a href="${esc(m.url)}" target=_blank rel=noopener>${esc(lang=="so"&&m.title_so?m.title_so:m.title)}</a></td><td>${esc(m.source_name)}</td><td>${esc(m.topics)}</td><td class="${m.sentiment}">${m.sentiment}</td></tr>`).join("")}
+ $("tb").innerHTML=r.map(m=>`<tr><td>${m.day}</td><td><a href="${esc(m.url)}" target=_blank rel=noopener>${esc(lang=="so"&&m.title_so?m.title_so:m.title)}</a>${(m.summary_so||m.summary_en)?`<details><summary>${t.sm}</summary><div style="margin-top:4px;color:#333">${esc(lang=="so"&&m.summary_so?m.summary_so:m.summary_en)}</div></details>`:""}</td><td>${esc(m.source_name)}</td><td>${esc(m.topics)}</td><td class="${m.sentiment}">${m.sentiment}</td></tr>`).join("")}
 </script></html>""", encoding="utf-8")
 print("exported", len(rows), "mentions")

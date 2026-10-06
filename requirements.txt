@@ -1,5 +1,7 @@
 requests>=2.32
-# Optional (better Somali translation / summaries):
+trafilatura>=2.0
+googlenewsdecoder>=0.1.7
+# Optional (better Somali translation + summaries):
 anthropic>=0.40
-# Optional free fallback translator:
+# Free fallback translator:
 deep-translator>=1.11

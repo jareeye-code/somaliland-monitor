@@ -9,6 +9,10 @@ def connect():
 def init():
     con = connect()
     con.executescript(pathlib.Path(__file__).with_name("schema.sql").read_text(encoding="utf-8"))
+    cols = {r[1] for r in con.execute("PRAGMA table_info(mentions)")}
+    for c in ("summary_en", "summary_so", "summary_status"):
+        if c not in cols:
+            con.execute(f"ALTER TABLE mentions ADD COLUMN {c} TEXT")
     con.commit(); con.close()
 
 def url_hash(url, title):
