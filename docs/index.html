@@ -1,34 +1,173 @@
-<!doctype html><html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Somaliland Media Monitor</title><style>
+<!doctype html>
+<html lang="so"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Somaliland Media Monitor</title>
+<style>
 body{font:15px system-ui,sans-serif;margin:0;background:#f6f7f9;color:#1b1f24}
-header{background:#0b5d3b;color:#fff;padding:14px 20px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
-main{max-width:1150px;margin:auto;padding:16px}.card{background:#fff;border-radius:10px;padding:14px;margin-bottom:14px;box-shadow:0 1px 3px #0001}
-button,select,input{padding:6px 10px;border:1px solid #ccc;border-radius:6px;background:#fff}button.on{background:#0b5d3b;color:#fff}
-.bar{display:flex;align-items:center;gap:8px;cursor:pointer;margin:3px 0}.k{width:90px;font-size:13px}.b{height:12px;background:#2e9e6b;border-radius:3px}
+header{background:#0b5d3b;color:#fff;padding:14px 20px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:center}
+main{max-width:1150px;margin:auto;padding:16px}
+.card{background:#fff;border-radius:10px;padding:14px;margin-bottom:14px;box-shadow:0 1px 3px #0001}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0}
+label{font-weight:600}
+button,select,input{padding:6px 10px;border:1px solid #ccc;border-radius:6px;background:#fff;font:inherit}
+input[type=date]{min-width:150px}
+button{cursor:pointer}button.on{background:#0b5d3b;color:#fff;border-color:#0b5d3b}
+.preset{background:#e8f3ee;border-color:#cfe6da;color:#0b5d3b}
+.bar{display:flex;align-items:center;gap:8px;cursor:pointer;margin:3px 0}.k{width:90px;font-size:13px;flex:none}.b{height:12px;background:#2e9e6b;border-radius:3px;min-width:1px}
+.stats{display:flex;flex-wrap:wrap;gap:10px}.stat{background:#eef5f1;border-radius:8px;padding:8px 14px}.stat b{font-size:20px;display:block}
+.chip{display:inline-block;background:#e8f3ee;border-radius:14px;padding:3px 10px;margin:2px;cursor:pointer;font-size:13px;color:#0b5d3b}
+.chip.on{background:#0b5d3b;color:#fff}
 td{padding:6px;border-bottom:1px solid #eee;font-size:14px;vertical-align:top}table{width:100%;border-collapse:collapse}
-pre{white-space:pre-wrap;font:14px/1.5 system-ui}.positive{color:#1a7f37}.negative{color:#c0392b}a{color:#0b5d3b}
-</style><header><b id=t></b><span><button id=lg></button></span></header><main>
-<div class=card><span id=pb></span> <select id=topic></select> <select id=type></select> <input id=q placeholder="..."></div>
-<div class=card><div id=bars></div></div><div class=card id=sum style="display:none"></div><div class=card><table id=tb></table></div></main>
+pre{white-space:pre-wrap;font:14px/1.5 system-ui;margin:6px 0 10px}
+.positive{color:#1a7f37}.negative{color:#c0392b}a{color:#0b5d3b}.muted{color:#666;font-size:13px}
+details{margin:4px 0}summary{cursor:pointer}
+</style></head><body>
+<header><b id="t"></b><span><button id="lg"></button></span></header>
+<main>
+<div class="card">
+  <div class="row">
+    <label id="lFrom" for="from"></label><input type="date" id="from">
+    <label id="lTo" for="to"></label><input type="date" id="to">
+    <span id="presets"></span>
+  </div>
+  <div class="row"><select id="topic"></select><select id="type"></select><input id="q" placeholder="..."></div>
+  <div class="muted" id="rangeNote"></div>
+</div>
+<div class="card" id="stats"></div>
+<div class="card"><h3 id="hBars" style="margin-top:0"></h3><div id="bars"></div></div>
+<div class="card" id="sum"></div>
+<div class="card"><h3 id="hList" style="margin-top:0"></h3><table id="tb"></table></div>
+</main>
 <script>
-const L={so:{t:"Kormeeraha Warbaahinta Caalamiga ee Somaliland",year:"Sannad",month:"Bil",day:"Maalin",all:"Dhammaan",s:"Soo koobid",sm:"Akhri soo koobidda",lg:"English"},
-en:{t:"Somaliland International Media Monitor",year:"Year",month:"Month",day:"Day",all:"All",s:"Summary",sm:"Read summary",lg:"Soomaali"}};
-let D,lang="so",per="month",key="",topic="",type="";
-const $=i=>document.getElementById(i),esc=s=>(s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-fetch("data.json").then(r=>r.json()).then(d=>{D=d;
- const tp=[...new Set(d.mentions.flatMap(m=>(m.topics||"").split(",")).filter(Boolean))].sort(),ty=[...new Set(d.mentions.map(m=>m.source_type))];
- $("topic").innerHTML="<option value=''>"+"topic</option>"+tp.map(x=>`<option>${x}</option>`).join("");
- $("type").innerHTML="<option value=''>type</option>"+ty.map(x=>`<option>${x}</option>`).join("");
- $("topic").onchange=e=>{topic=e.target.value;draw()};$("type").onchange=e=>{type=e.target.value;draw()};$("q").oninput=draw;
- $("lg").onclick=()=>{lang=lang=="so"?"en":"so";draw()};draw()});
-function draw(){const t=L[lang];document.documentElement.lang=lang;$("t").textContent=t.t;$("lg").textContent=t.lg;
- $("pb").innerHTML=["year","month","day"].map(p=>`<button class="${p==per?"on":""}" onclick="per='${p}';key='';draw()">${t[p]}</button>`).join(" ");
- const c={};D.mentions.forEach(m=>{const k=m[per];if(k)c[k]=(c[k]||0)+1});
- const ks=Object.keys(c).sort().reverse().slice(0,36),mx=Math.max(1,...ks.map(k=>c[k]));
- $("bars").innerHTML=ks.map(k=>`<div class=bar onclick="key='${k}';draw()"><span class=k>${k}</span><span class=b style="width:${c[k]/mx*100}%"></span><span>${c[k]}</span></div>`).join("");
- const s=D.summaries.find(x=>x.period==per&&x.period_key==key);
- $("sum").style.display=s?"block":"none";if(s)$("sum").innerHTML=`<h3>${t.s} — ${key} (${s.mention_count})</h3><pre>${esc(lang=="so"&&s.summary_so?s.summary_so:s.summary_en)}</pre>`;
- const q=$("q").value.toLowerCase();
- const r=D.mentions.filter(m=>(!key||m[per]==key)&&(!topic||(","+m.topics+",").includes(","+topic+","))&&(!type||m.source_type==type)&&(!q||((m.title||"")+(m.title_so||"")).toLowerCase().includes(q))).slice(0,300);
- $("tb").innerHTML=r.map(m=>`<tr><td>${m.day}</td><td><a href="${esc(m.url)}" target=_blank rel=noopener>${esc(lang=="so"&&m.title_so?m.title_so:m.title)}</a>${(m.summary_so||m.summary_en)?`<details><summary>${t.sm}</summary><div style="margin-top:4px;color:#333">${esc(lang=="so"&&m.summary_so?m.summary_so:m.summary_en)}</div></details>`:""}</td><td>${esc(m.source_name)}</td><td>${esc(m.topics)}</td><td class="${m.sentiment}">${m.sentiment}</td></tr>`).join("")}
-</script></html>
+const L={
+ so:{t:"Kormeeraha Warbaahinta Caalamiga ee Somaliland",from:"Laga bilaabo",to:"Ilaa",lg:"English",topic:"Mawduuc: dhammaan",type:"Nooca: dhammaan",
+     q:"Raadi...",today:"Maanta",d7:"7 maalmood",d30:"30 maalmood",month:"Bishan",year:"Sannadkan",all:"Dhammaan",
+     total:"Wadarta wararka",topics:"Mawduucyada",sources:"Ilaha ugu badan",sent:"Dareenka",bars:"Tirada wararka",
+     byDay:"maalin kasta",byMonth:"bil kasta",byYear:"sannad kasta",click:"Riix baar si aad u aragto muddadaas",
+     sum:"Soo koobid",noSum:"Weli ma jirto soo koobid la keydiyey muddadan.",sumDay:"soo koobidda maalinlaha ah",sumMonth:"soo koobidda bilaha ee muddadan",sumYear:"soo koobidda sannadaha ee muddadan",
+     list:"Wararka",showing:"Waxaa la tusayaa",of:"ka mid ah",read:"Akhri soo koobidda",none:"Wax war ah looma helin muddadan.",
+     range:"Muddada la doortay",days:"maalmood",positive:"Wanaagsan",negative:"Xun",neutral:"Dhexdhexaad"},
+ en:{t:"Somaliland International Media Monitor",from:"From",to:"To",lg:"Soomaali",topic:"Topic: all",type:"Type: all",
+     q:"Search...",today:"Today",d7:"Last 7 days",d30:"Last 30 days",month:"This month",year:"This year",all:"All time",
+     total:"Total mentions",topics:"Topics",sources:"Top sources",sent:"Tone",bars:"Mentions",
+     byDay:"per day",byMonth:"per month",byYear:"per year",click:"click a bar to zoom to that period",
+     sum:"Summary",noSum:"No stored summary for this range yet.",sumDay:"daily summaries",sumMonth:"monthly summaries covering this range",sumYear:"yearly summaries covering this range",
+     list:"Mentions",showing:"Showing",of:"of",read:"Read summary",none:"No mentions found in this range.",
+     range:"Selected range",days:"days",positive:"Positive",negative:"Negative",neutral:"Neutral"}
+};
+const TOPIC_SO={recognition:"Aqoonsi",israel:"Israa'iil",geography:"Juquraafi",usa:"Mareykanka",ethiopia:"Itoobiya",uae:"Imaaraadka",china_taiwan:"Shiinaha / Taiwan",conference:"Shir",somalia:"Soomaaliya",security:"Amni",economy:"Dhaqaale"};
+
+let D={mentions:[],summaries:[]}, lang="so", topic="", type="";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const iso=d=>d.toISOString().slice(0,10);
+const addDays=(s,n)=>{const d=new Date(s+"T00:00:00Z");d.setUTCDate(d.getUTCDate()+n);return iso(d)};
+const daysBetween=(a,b)=>Math.round((new Date(b+"T00:00:00Z")-new Date(a+"T00:00:00Z"))/864e5);
+const monthEnd=ym=>{const p=ym.split("-").map(Number);return iso(new Date(Date.UTC(p[0],p[1],0)))};
+const todayStr=()=>{const n=new Date();return n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-"+String(n.getDate()).padStart(2,"0")};
+const tname=k=>lang==="so"&&TOPIC_SO[k]?TOPIC_SO[k]:k;
+
+function granFor(span){return span<=62?"day":span<=1100?"month":"year"}
+function bucketKey(day,g){return g==="day"?day:g==="month"?day.slice(0,7):day.slice(0,4)}
+function bucketRange(k,g){return g==="day"?[k,k]:g==="month"?[k+"-01",monthEnd(k)]:[k+"-01-01",k+"-12-31"]}
+function bucketList(from,to,g){
+  const out=[];
+  if(g==="day"){for(let d=from;d<=to;d=addDays(d,1))out.push(d)}
+  else if(g==="month"){let y=+from.slice(0,4),m=+from.slice(5,7);const ey=+to.slice(0,4),em=+to.slice(5,7);
+    while(y<ey||(y===ey&&m<=em)){out.push(y+"-"+String(m).padStart(2,"0"));m++;if(m>12){m=1;y++}}}
+  else{for(let y=+from.slice(0,4);y<=+to.slice(0,4);y++)out.push(String(y))}
+  return out;
+}
+function getRange(){
+  let f=$("from").value,t=$("to").value;
+  if(!f&&!t){t=todayStr();f=addDays(t,-29)}
+  if(!f)f=t; if(!t)t=f;
+  if(f>t){const x=f;f=t;t=x}
+  return [f,t];
+}
+function setRange(f,t){$("from").value=f;$("to").value=t;draw()}
+function matches(m,q){
+  if(topic&&(","+(m.topics||"")+",").indexOf(","+topic+",")<0)return false;
+  if(type&&m.source_type!==type)return false;
+  if(q&&((m.title||"")+" "+(m.title_so||"")).toLowerCase().indexOf(q)<0)return false;
+  return true;
+}
+function topN(counter,n){return Object.entries(counter).sort((a,b)=>b[1]-a[1]).slice(0,n)}
+
+function drawPresets(){
+  const t=L[lang],td=todayStr();
+  const defs=[["today",td,td],["d7",addDays(td,-6),td],["d30",addDays(td,-29),td],["month",td.slice(0,7)+"-01",td],["year",td.slice(0,4)+"-01-01",td]];
+  let all=null;
+  if(D.mentions.length){const ds=D.mentions.map(m=>m.day).filter(Boolean).sort();all=[ds[0],ds[ds.length-1]>td?ds[ds.length-1]:td]}
+  $("presets").innerHTML=defs.map(d=>`<button class="preset" data-f="${d[1]}" data-t="${d[2]}">${t[d[0]]}</button>`).join(" ")+
+    (all?` <button class="preset" data-f="${all[0]}" data-t="${all[1]}">${t.all}</button>`:"");
+  $("presets").querySelectorAll("button").forEach(b=>b.onclick=()=>setRange(b.dataset.f,b.dataset.t));
+}
+
+function draw(){
+  const t=L[lang];document.documentElement.lang=lang;
+  $("t").textContent=t.t;$("lg").textContent=t.lg;$("lFrom").textContent=t.from;$("lTo").textContent=t.to;$("q").placeholder=t.q;
+  $("topic").options[0].textContent=t.topic;$("type").options[0].textContent=t.type;
+  [...$("topic").options].slice(1).forEach(o=>o.textContent=tname(o.value));
+  drawPresets();
+  const [from,to]=getRange();
+  const span=daysBetween(from,to)+1;
+  $("rangeNote").textContent=t.range+": "+from+"  →  "+to+"  ("+span+" "+t.days+")";
+  const q=$("q").value.trim().toLowerCase();
+
+  // everything inside the date range and the other filters
+  const inRange=D.mentions.filter(m=>m.day&&m.day>=from&&m.day<=to);
+  const rows=inRange.filter(m=>matches(m,q));
+
+  // statistics
+  const sent={positive:0,negative:0,neutral:0},tc={},sc={};
+  rows.forEach(m=>{sent[m.sentiment]=(sent[m.sentiment]||0)+1;
+    (m.topics||"").split(",").filter(Boolean).forEach(x=>tc[x]=(tc[x]||0)+1);
+    if(m.source_name)sc[m.source_name]=(sc[m.source_name]||0)+1});
+  $("stats").innerHTML=`<div class="stats"><div class="stat">${t.total}<b>${rows.length}</b></div>`+
+    ["positive","neutral","negative"].map(k=>`<div class="stat ${k}">${t[k]}<b>${sent[k]||0}</b></div>`).join("")+`</div>`+
+    `<div style="margin-top:8px"><b>${t.topics}:</b> `+topN(tc,10).map(([k,v])=>`<span class="chip ${topic===k?"on":""}" data-topic="${esc(k)}">${esc(tname(k))} · ${v}</span>`).join("")+`</div>`+
+    `<div style="margin-top:6px"><b>${t.sources}:</b> <span class="muted">`+topN(sc,6).map(([k,v])=>esc(k)+" ("+v+")").join(", ")+`</span></div>`;
+  $("stats").querySelectorAll("[data-topic]").forEach(c=>c.onclick=()=>{topic=topic===c.dataset.topic?"":c.dataset.topic;$("topic").value=topic;draw()});
+
+  // bars: day / month / year automatically, depending on how long the range is
+  const g=granFor(span),cnt={};
+  rows.forEach(m=>{const k=bucketKey(m.day,g);cnt[k]=(cnt[k]||0)+1});
+  const keys=bucketList(from,to,g),mx=Math.max(1,...keys.map(k=>cnt[k]||0));
+  $("hBars").textContent=t.bars+" – "+(g==="day"?t.byDay:g==="month"?t.byMonth:t.byYear);
+  $("bars").innerHTML=keys.map(k=>`<div class="bar" data-k="${k}"><span class="k">${k}</span><span class="b" style="width:${(cnt[k]||0)/mx*70}%"></span><span>${cnt[k]||0}</span></div>`).join("")+
+    `<div class="muted" style="margin-top:6px">${t.click}</div>`;
+  $("bars").querySelectorAll(".bar").forEach(b=>b.onclick=()=>{const r=bucketRange(b.dataset.k,g);setRange(r[0],r[1])});
+
+  // stored summaries (made by the agent) that belong to this range
+  const sp=span<=31?"day":span<=800?"month":"year";
+  const fk=bucketKey(from,sp),tk=bucketKey(to,sp);
+  const sums=D.summaries.filter(s=>s.period===sp&&s.period_key>=fk&&s.period_key<=tk).sort((a,b)=>a.period_key<b.period_key?1:-1).slice(0,40);
+  const lab=sp==="day"?t.sumDay:sp==="month"?t.sumMonth:t.sumYear;
+  $("sum").innerHTML=`<h3 style="margin-top:0">${t.sum} – ${lab}</h3>`+(sums.length?
+    sums.map(s=>`<details ${sums.length===1?"open":""}><summary><b>${esc(s.period_key)}</b> (${s.mention_count})</summary><pre>${esc(lang==="so"&&s.summary_so?s.summary_so:s.summary_en)}</pre></details>`).join(""):
+    `<div class="muted">${t.noSum}</div>`);
+
+  // list
+  $("hList").textContent=t.list+" – "+t.showing+" "+Math.min(rows.length,500)+" "+t.of+" "+rows.length;
+  $("tb").innerHTML=rows.length?rows.slice(0,500).map(m=>{
+    const title=lang==="so"&&m.title_so?m.title_so:m.title;
+    const sm=(m.summary_so||m.summary_en)?`<details><summary>${t.read}</summary><div style="margin-top:4px;color:#333">${esc(lang==="so"&&m.summary_so?m.summary_so:m.summary_en)}</div></details>`:"";
+    return `<tr><td>${esc(m.day)}</td><td><a href="${esc(m.url)}" target="_blank" rel="noopener">${esc(title)}</a>${sm}</td><td>${esc(m.source_name)}</td><td>${esc((m.topics||"").split(",").filter(Boolean).map(tname).join(", "))}</td><td class="${esc(m.sentiment)}">${esc(t[m.sentiment]||m.sentiment)}</td></tr>`}).join(""):
+    `<tr><td class="muted">${t.none}</td></tr>`;
+}
+
+function init(){
+  const tp=[...new Set(D.mentions.flatMap(m=>(m.topics||"").split(",")).filter(Boolean))].sort();
+  const ty=[...new Set(D.mentions.map(m=>m.source_type).filter(Boolean))].sort();
+  $("topic").innerHTML="<option value=''></option>"+tp.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join("");
+  $("type").innerHTML="<option value=''></option>"+ty.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join("");
+  $("topic").onchange=e=>{topic=e.target.value;draw()};$("type").onchange=e=>{type=e.target.value;draw()};
+  $("q").oninput=draw;$("from").onchange=draw;$("to").onchange=draw;
+  $("lg").onclick=()=>{lang=lang==="so"?"en":"so";draw()};
+  // start with the 30 days that end on the newest mention (or today)
+  const ds=D.mentions.map(m=>m.day).filter(Boolean).sort(),end=ds.length?ds[ds.length-1]:todayStr();
+  $("to").value=end;$("from").value=addDays(end,-29);
+  draw();
+}
+fetch("data.json").then(r=>r.json()).then(d=>{D=d;init()}).catch(()=>{init()});
+</script></body></html>
