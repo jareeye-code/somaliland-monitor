@@ -7,6 +7,11 @@ on:
       backfill:
         description: "History window for first run (e.g. 90d, 365d)"
         default: "7d"
+# the collector and the publisher must never write the database at the same time
+concurrency:
+  group: monitor-db
+  cancel-in-progress: false
+
 permissions:
   contents: write
 jobs:
@@ -29,4 +34,5 @@ jobs:
           git config user.name "monitor-bot"; git config user.email "bot@users.noreply.github.com"
           git add somaliland.db docs
           git commit -m "Update $(date -u +%F-%H%M)" || echo "nothing new"
+          git pull --rebase || true
           git push
