@@ -1,7 +1,8 @@
 requests>=2.32
+requests-oauthlib>=2.0
 trafilatura>=2.0
 googlenewsdecoder>=0.1.7
-# Optional (better Somali translation + summaries):
+# Optional (better Somali translation, summaries and post polishing):
 anthropic>=0.40
 # Free fallback translator:
 deep-translator>=1.11

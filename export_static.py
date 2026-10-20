@@ -1,5 +1,5 @@
 """Exports the database to docs/index.html (+ data.json): the static dashboard for GitHub Pages.
-New: two date pickers (From / To) select ANY date range; bars switch automatically between day / month / year."""
+Date-range pickers, auto day/month/year bars, and a "select results -> publish / share" panel."""
 import json, pathlib, db
 
 TEMPLATE = r'''<!doctype html>
@@ -24,6 +24,9 @@ td{padding:6px;border-bottom:1px solid #eee;font-size:14px;vertical-align:top}ta
 pre{white-space:pre-wrap;font:14px/1.5 system-ui;margin:6px 0 10px}
 .positive{color:#1a7f37}.negative{color:#c0392b}a{color:#0b5d3b}.muted{color:#666;font-size:13px}
 details{margin:4px 0}summary{cursor:pointer}
+textarea{width:100%;box-sizing:border-box;min-height:150px;padding:8px;border:1px solid #ccc;border-radius:6px;font:14px/1.45 system-ui}
+.share a{display:inline-block;margin:3px 6px 3px 0;padding:6px 12px;border-radius:6px;background:#0b5d3b;color:#fff;text-decoration:none}
+.pubcard{border:2px solid #0b5d3b}
 </style></head><body>
 <header><b id="t"></b><span><button id="lg"></button></span></header>
 <main>
@@ -37,6 +40,7 @@ details{margin:4px 0}summary{cursor:pointer}
   <div class="muted" id="rangeNote"></div>
 </div>
 <div class="card" id="stats"></div>
+<div class="card pubcard" id="pub" style="display:none"></div>
 <div class="card"><h3 id="hBars" style="margin-top:0"></h3><div id="bars"></div></div>
 <div class="card" id="sum"></div>
 <div class="card"><h3 id="hList" style="margin-top:0"></h3><table id="tb"></table></div>
@@ -49,18 +53,18 @@ const L={
      byDay:"maalin kasta",byMonth:"bil kasta",byYear:"sannad kasta",click:"Riix baar si aad u aragto muddadaas",
      sum:"Soo koobid",noSum:"Weli ma jirto soo koobid la keydiyey muddadan.",sumDay:"soo koobidda maalinlaha ah",sumMonth:"soo koobidda bilaha ee muddadan",sumYear:"soo koobidda sannadaha ee muddadan",
      list:"Wararka",showing:"Waxaa la tusayaa",of:"ka mid ah",read:"Akhri soo koobidda",none:"Wax war ah looma helin muddadan.",
-     range:"Muddada la doortay",days:"maalmood",positive:"Wanaagsan",negative:"Xun",neutral:"Dhexdhexaad"},
+     range:"Muddada la doortay",days:"maalmood",selected:"La doortay",pubTitle:"Daabaci natiijooyinka la doortay",copyText:"Koobi qoraalka",copyIds:"Koobi ID-yada",clear:"Tirtir doorashada",shareOn:"Ku wadaag",agent:"Fur wakiilka daabacaadda (GitHub)",hint:"Daabacaad otomaatig ah: koobi ID-yada, kadibna ku dheji goobta ids ee wakiilka daabacaadda. Badhamada hoose waxay furaan daaqadda wadaagista ee shabakadaha bulshada (adiga ayaa gujinaya Post).",selAll:"Dooro dhammaan kuwa la muujiyey",positive:"Wanaagsan",negative:"Xun",neutral:"Dhexdhexaad"},
  en:{t:"Somaliland International Media Monitor",from:"From",to:"To",lg:"Soomaali",topic:"Topic: all",type:"Type: all",
      q:"Search...",today:"Today",d7:"Last 7 days",d30:"Last 30 days",month:"This month",year:"This year",all:"All time",
      total:"Total mentions",topics:"Topics",sources:"Top sources",sent:"Tone",bars:"Mentions",
      byDay:"per day",byMonth:"per month",byYear:"per year",click:"click a bar to zoom to that period",
      sum:"Summary",noSum:"No stored summary for this range yet.",sumDay:"daily summaries",sumMonth:"monthly summaries covering this range",sumYear:"yearly summaries covering this range",
      list:"Mentions",showing:"Showing",of:"of",read:"Read summary",none:"No mentions found in this range.",
-     range:"Selected range",days:"days",positive:"Positive",negative:"Negative",neutral:"Neutral"}
+     range:"Selected range",days:"days",selected:"Selected",pubTitle:"Publish selected results",copyText:"Copy text",copyIds:"Copy IDs",clear:"Clear selection",shareOn:"Share on",agent:"Open publishing agent (GitHub)",hint:"To publish automatically: copy the IDs and paste them in the ids box of the publishing agent. The buttons below only open the network's own share window (you press Post yourself).",selAll:"Select all shown",positive:"Positive",negative:"Negative",neutral:"Neutral"}
 };
 const TOPIC_SO={recognition:"Aqoonsi",israel:"Israa'iil",geography:"Juquraafi",usa:"Mareykanka",ethiopia:"Itoobiya",uae:"Imaaraadka",china_taiwan:"Shiinaha / Taiwan",conference:"Shir",somalia:"Soomaaliya",security:"Amni",economy:"Dhaqaale"};
 
-let D={mentions:[],summaries:[]}, lang="so", topic="", type="";
+let D={mentions:[],summaries:[]}, lang="so", topic="", type="", selected=new Set(), postDirty=false, lastKey="";
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const iso=d=>d.toISOString().slice(0,10);
@@ -153,11 +157,65 @@ function draw(){
 
   // list
   $("hList").textContent=t.list+" – "+t.showing+" "+Math.min(rows.length,500)+" "+t.of+" "+rows.length;
-  $("tb").innerHTML=rows.length?rows.slice(0,500).map(m=>{
+  const head=`<tr><th style="width:28px"><input type="checkbox" id="selAll" title="${esc(t.selAll)}"></th><th colspan="4" class="muted" style="text-align:left;font-weight:400">${esc(t.selAll)}</th></tr>`;
+  $("tb").innerHTML=rows.length?head+rows.slice(0,500).map(m=>{
     const title=lang==="so"&&m.title_so?m.title_so:m.title;
     const sm=(m.summary_so||m.summary_en)?`<details><summary>${t.read}</summary><div style="margin-top:4px;color:#333">${esc(lang==="so"&&m.summary_so?m.summary_so:m.summary_en)}</div></details>`:"";
-    return `<tr><td>${esc(m.day)}</td><td><a href="${esc(m.url)}" target="_blank" rel="noopener">${esc(title)}</a>${sm}</td><td>${esc(m.source_name)}</td><td>${esc((m.topics||"").split(",").filter(Boolean).map(tname).join(", "))}</td><td class="${esc(m.sentiment)}">${esc(t[m.sentiment]||m.sentiment)}</td></tr>`}).join(""):
+    const cb=m.id!=null?`<input type="checkbox" class="sel" data-id="${esc(m.id)}" ${selected.has(String(m.id))?"checked":""}>`:"";
+    return `<tr><td>${cb}</td><td>${esc(m.day)}</td><td><a href="${esc(m.url)}" target="_blank" rel="noopener">${esc(title)}</a>${sm}</td><td>${esc(m.source_name)}</td><td>${esc((m.topics||"").split(",").filter(Boolean).map(tname).join(", "))}</td><td class="${esc(m.sentiment)}">${esc(t[m.sentiment]||m.sentiment)}</td></tr>`}).join(""):
     `<tr><td class="muted">${t.none}</td></tr>`;
+  $("tb").querySelectorAll(".sel").forEach(c=>c.onchange=()=>{c.checked?selected.add(c.dataset.id):selected.delete(c.dataset.id);drawPub()});
+  const sa=$("selAll");if(sa){sa.checked=rows.slice(0,500).length>0&&rows.slice(0,500).every(m=>selected.has(String(m.id)));
+    sa.onchange=()=>{rows.slice(0,500).forEach(m=>{if(m.id!=null)sa.checked?selected.add(String(m.id)):selected.delete(String(m.id))});
+      $("tb").querySelectorAll(".sel").forEach(c=>c.checked=sa.checked);drawPub()}}
+  drawPub();
+}
+
+function siteUrl(){return location.origin+location.pathname.replace(/index\.html$/,"")}
+function agentUrl(){const h=location.hostname;if(h.endsWith(".github.io")){const repo=location.pathname.split("/")[1];if(repo)return "https://github.com/"+h.split(".")[0]+"/"+repo+"/actions/workflows/publish.yml"}return ""}
+function copyTo(text,btn){
+  const flash=()=>{const o=btn.textContent;btn.textContent="✔";setTimeout(()=>btn.textContent=o,1200)};
+  const old=()=>{const ta=document.createElement("textarea");ta.value=text;document.body.appendChild(ta);ta.select();try{document.execCommand("copy")}catch(e){}document.body.removeChild(ta);flash()};
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).then(flash,old);else old();
+}
+function pickedItems(){
+  return D.mentions.filter(m=>m.id!=null&&selected.has(String(m.id))).sort((a,b)=>(a.day<b.day?1:-1));
+}
+function buildPostText(items){
+  const [from,to]=getRange();
+  const head=lang==="so"?"📰 Somaliland warbaahinta":"📰 Somaliland in the media";
+  const ttl=m=>lang==="so"&&m.title_so?m.title_so:m.title;
+  if(items.length===1){const m=items[0];const sm=lang==="so"?(m.summary_so||m.summary_en):m.summary_en;
+    return "📰 "+ttl(m)+(sm?"\n"+sm:"")+"\n"+(lang==="so"?"Ilaha: ":"Source: ")+(m.source_name||"")+" · "+m.day+"\n"+m.url+"\n#Somaliland"}
+  const days=items.map(m=>m.day).sort();
+  return head+" — "+days[0]+(days[0]!==days[days.length-1]?" → "+days[days.length-1]:"")+"\n\n"+
+    items.slice(0,10).map((m,i)=>(i+1)+") "+ttl(m)+" — "+(m.source_name||"")).join("\n")+"\n\n"+siteUrl()+"\n#Somaliland"}
+function drawPub(){
+  const box=$("pub"),t=L[lang],items=pickedItems();
+  if(!items.length){box.style.display="none";box.innerHTML="";lastKey="";return}
+  box.style.display="block";
+  const key=items.map(m=>m.id).join(",")+"|"+lang;
+  if(key!==lastKey){lastKey=key;postDirty=false}
+  const keep=$("postText")&&postDirty?$("postText").value:buildPostText(items);
+  const link=items.length===1?items[0].url:siteUrl();
+  const e=encodeURIComponent,tx=keep,short=tx.length>250?tx.slice(0,247)+"…":tx;
+  const ag=agentUrl();
+  box.innerHTML=`<h3 style="margin-top:0">${t.pubTitle} (${t.selected}: ${items.length})</h3>
+   <div class="muted" style="margin-bottom:6px">IDs: <b id="idsOut">${items.map(m=>m.id).join(",")}</b></div>
+   <textarea id="postText">${esc(keep)}</textarea>
+   <div class="row"><button id="cpText">${t.copyText}</button><button id="cpIds">${t.copyIds}</button><button id="clr">${t.clear}</button>${ag?`<a href="${esc(ag)}" target="_blank" rel="noopener">${t.agent}</a>`:""}</div>
+   <div class="share"><b>${t.shareOn}:</b>
+    <a target="_blank" rel="noopener" data-n="fb" href="https://www.facebook.com/sharer/sharer.php?u=${e(link)}">Facebook</a>
+    <a target="_blank" rel="noopener" data-n="x" href="https://twitter.com/intent/tweet?text=${e(short)}&url=${e(link)}">X</a>
+    <a target="_blank" rel="noopener" data-n="tg" href="https://t.me/share/url?url=${e(link)}&text=${e(tx)}">Telegram</a>
+    <a target="_blank" rel="noopener" data-n="wa" href="https://wa.me/?text=${e(tx)}">WhatsApp</a>
+    <a target="_blank" rel="noopener" data-n="li" href="https://www.linkedin.com/sharing/share-offsite/?url=${e(link)}">LinkedIn</a></div>
+   <div class="muted" style="margin-top:6px">${t.hint}</div>`;
+  $("postText").oninput=()=>{postDirty=true};
+  $("postText").onchange=()=>drawPub();
+  $("cpText").onclick=ev=>copyTo($("postText").value,ev.target);
+  $("cpIds").onclick=ev=>copyTo(items.map(m=>m.id).join(","),ev.target);
+  $("clr").onclick=()=>{selected.clear();postDirty=false;draw()};
 }
 
 function init(){
@@ -179,7 +237,7 @@ fetch("data.json").then(r=>r.json()).then(d=>{D=d;init()}).catch(()=>{init()});
 
 db.init(); con = db.connect()
 rows = [dict(r) for r in con.execute(
-    "SELECT day,month,year,source_type,source_name,title,title_so,url,topics,sentiment,country,summary_en,summary_so FROM mentions ORDER BY day DESC, id DESC LIMIT 20000")]
+    "SELECT id,day,month,year,source_type,source_name,title,title_so,url,topics,sentiment,country,summary_en,summary_so FROM mentions ORDER BY day DESC, id DESC LIMIT 20000")]
 summ = [dict(r) for r in con.execute("SELECT period,period_key,summary_en,summary_so,mention_count FROM summaries")]
 con.close()
 out = pathlib.Path("docs"); out.mkdir(exist_ok=True)
