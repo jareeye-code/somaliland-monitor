@@ -1,0 +1,115 @@
+name: Publish to social media
+
+# MANUAL: GitHub > Actions > "Publish to social media" > Run workflow  (choose what, when and where).
+# AUTO (later): create a repository variable AUTO_PUBLISH = true (Settings > Secrets and variables > Actions > Variables).
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "What to publish"
+        type: choice
+        options: [digest, report, items, check_connections]
+        default: digest
+      period:
+        description: "Which dates (digest/report)"
+        type: choice
+        options: [today, yesterday, last_7_days, last_30_days, this_month, this_year, custom]
+        default: last_7_days
+      from_date:
+        description: "Custom start date YYYY-MM-DD (only if period = custom)"
+        required: false
+      to_date:
+        description: "Custom end date YYYY-MM-DD (only if period = custom)"
+        required: false
+      top:
+        description: "How many top results"
+        type: choice
+        options: ["3", "5", "10"]
+        default: "5"
+      ids:
+        description: "Result IDs copied from the website (comma separated). If filled, these exact results are used."
+        required: false
+      platforms:
+        description: "facebook,telegram,x,linkedin,mastodon,bluesky  or  all"
+        default: "facebook"
+      lang:
+        description: "Language of the post"
+        type: choice
+        options: [both, so, en]
+        default: both
+      dry_run:
+        description: "Preview only - post NOTHING (untick to really publish)"
+        type: boolean
+        default: true
+  schedule:
+    - cron: "30 6 * * *"        # every day 06:30 UTC - only runs if AUTO_PUBLISH = true
+
+# the collector and the publisher must never write the database at the same time
+concurrency:
+  group: monitor-db
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: github.event_name == 'workflow_dispatch' || vars.AUTO_PUBLISH == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.13" }
+      - run: pip install -r requirements.txt
+      - name: Publish
+        env:
+          EVENT: ${{ github.event_name }}
+          MODE: ${{ inputs.mode }}
+          PERIOD: ${{ inputs.period }}
+          FROM_DATE: ${{ inputs.from_date }}
+          TO_DATE: ${{ inputs.to_date }}
+          TOP: ${{ inputs.top }}
+          IDS: ${{ inputs.ids }}
+          PLATFORMS_IN: ${{ inputs.platforms }}
+          LANG_IN: ${{ inputs.lang }}
+          DRY_IN: ${{ inputs.dry_run }}
+          AUTO_TOP: ${{ vars.AUTO_TOP }}
+          AUTO_PLATFORMS: ${{ vars.AUTO_PLATFORMS }}
+          AUTO_LANG: ${{ vars.AUTO_LANG }}
+          FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
+          FB_PAGE_TOKEN: ${{ secrets.FB_PAGE_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_SECRET: ${{ secrets.X_ACCESS_SECRET }}
+          LINKEDIN_TOKEN: ${{ secrets.LINKEDIN_TOKEN }}
+          LINKEDIN_AUTHOR_URN: ${{ secrets.LINKEDIN_AUTHOR_URN }}
+          MASTODON_BASE_URL: ${{ secrets.MASTODON_BASE_URL }}
+          MASTODON_TOKEN: ${{ secrets.MASTODON_TOKEN }}
+          BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
+          BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ "$MODE" = "check_connections" ]; then
+            python publish.py --check | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [ "$EVENT" = "schedule" ]; then
+            # automatic run: yesterday's top results, REALLY published (only when AUTO_PUBLISH = true)
+            python publish.py --mode digest --period yesterday --top "${AUTO_TOP:-3}" \
+              --platforms "${AUTO_PLATFORMS:-facebook}" --lang "${AUTO_LANG:-both}" --publish
+          else
+            FLAG=""
+            if [ "$DRY_IN" = "false" ]; then FLAG="--publish"; fi
+            python publish.py --mode "$MODE" --period "$PERIOD" --from "$FROM_DATE" --to "$TO_DATE" --top "$TOP" \
+              --ids "$IDS" --platforms "$PLATFORMS_IN" --lang "$LANG_IN" $FLAG
+          fi
+      - name: Save the publishing log
+        run: |
+          git config user.name "monitor-bot"; git config user.email "bot@users.noreply.github.com"
+          git add somaliland.db
+          git commit -m "Publishing log $(date -u +%F-%H%M)" || echo "nothing to save"
+          git pull --rebase || true
+          git push || true
