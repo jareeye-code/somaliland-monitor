@@ -11,6 +11,13 @@ class PostError(Exception):
     pass
 
 
+def fb_url(path):
+    """Graph API address. Without FB_GRAPH_VERSION Meta uses the oldest version it still supports, so the call never breaks
+    when a version is retired. To pin a version, add a repository secret FB_GRAPH_VERSION such as v26.0."""
+    v = os.environ.get("FB_GRAPH_VERSION", "").strip().strip("/")
+    return "https://graph.facebook.com/" + (v + "/" if v else "") + path
+
+
 def _ok(r, what):
     if r.status_code >= 300:
         raise PostError(f"{what}: HTTP {r.status_code} {r.text[:300]}")
@@ -26,7 +33,7 @@ class Facebook:
     def post(self, text, link=None):
         data = {"message": text, "access_token": os.environ["FB_PAGE_TOKEN"]}
         if link: data["link"] = link
-        r = _ok(requests.post(f"https://graph.facebook.com/v21.0/{os.environ['FB_PAGE_ID']}/feed", data=data, timeout=TIMEOUT), "Facebook")
+        r = _ok(requests.post(fb_url(os.environ["FB_PAGE_ID"] + "/feed"), data=data, timeout=TIMEOUT), "Facebook")
         return r.json().get("id", "")
 
 
@@ -140,7 +147,7 @@ def check(c):
         if not c.configured():
             return "NOT CONNECTED - secrets missing"
         if c.name == "facebook":
-            r = _ok(requests.get(f"https://graph.facebook.com/v21.0/{os.environ['FB_PAGE_ID']}", timeout=TIMEOUT,
+            r = _ok(requests.get(fb_url(os.environ["FB_PAGE_ID"]), timeout=TIMEOUT,
                                  params={"fields": "name", "access_token": os.environ["FB_PAGE_TOKEN"]}), "Facebook")
             return "OK - page: " + r.json().get("name", "?")
         if c.name == "telegram":
